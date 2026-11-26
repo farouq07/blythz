@@ -49,15 +49,20 @@ local FADERS = true
 local UNANCHOR = true
 local Disable_Jump = false
 
+local ALIVE = true
+local CONNS = {}
+local function track(c) table.insert(CONNS, c); return c end
+
 local ArtificialHB = IT("BindableEvent")
 local tf = 0
-RunService.Heartbeat:Connect(function(s)
+track(RunService.Heartbeat:Connect(function(s)
+	if not ALIVE then return end
 	tf = tf + s
 	if tf >= Frame_Speed then
 		for _ = 1, math.floor(tf/Frame_Speed) do ArtificialHB:Fire() end
 		tf = tf - Frame_Speed*math.floor(tf/Frame_Speed)
 	end
-end)
+end))
 
 local function Swait(n)
 	if n == 0 or n == nil then ArtificialHB.Event:Wait() else for _ = 1, n do ArtificialHB.Event:Wait() end end
@@ -324,41 +329,70 @@ CreateMesh("SpecialMesh", BLADE, "FileMesh", "93117521", "1015990846", VT(1,1,1)
 BLADE.CFrame = RootPart.CFrame * CF(0.4,1,4) * ANGLES(RAD(195),RAD(15),RAD(15))
 BLADE.Transparency = 1
 
+local function resolveAcc(character, id, wantedName)
+	local idStr = tostring(id)
+	for _, v in ipairs(character:GetChildren()) do
+		if v:IsA("Accessory") or v:IsA("Hat") then
+			for _, d in ipairs(v:GetDescendants()) do
+				if d:IsA("MeshPart") and tostring(d.MeshId):find(idStr,1,true) then return v end
+				if d:IsA("SpecialMesh") and (tostring(d.MeshId):find(idStr,1,true) or tostring(d.TextureId):find(idStr,1,true)) then return v end
+				if (d:IsA("Decal") or d:IsA("Texture")) and tostring(d.Texture):find(idStr,1,true) then return v end
+			end
+		end
+	end
+	if wantedName then
+		for _, v in ipairs(character:GetChildren()) do
+			if (v:IsA("Accessory") or v:IsA("Hat")) and v.Name == wantedName then return v end
+		end
+		for _, v in ipairs(character:GetChildren()) do
+			if (v:IsA("Accessory") or v:IsA("Hat")) and (v.Name:find(wantedName,1,true) or wantedName:find(v.Name,1,true)) then return v end
+		end
+		for _, v in ipairs(character:GetChildren()) do
+			if v:IsA("Accessory") or v:IsA("Hat") then
+				if v.Name:lower():find("sword",1,true) or v.Name:lower():find("blade",1,true) or v.Name:lower():find("abyss",1,true) then return v end
+			end
+		end
+	end
+	return nil
+end
+
 local hatid = bytexfesettings.bhatid
 local hatcf = bytexfesettings.bcframele
 local hatlimb = bytexfesettings.bhatlimb or "Right Arm"
+local hatname = bytexfesettings.bhatname
 if bytexfesettings.usinghats and hatid and hatcf then
-	local timeout = 0
-	while not (Character and Character:FindFirstChild(hatlimb)) and timeout < 5 do
-		task.wait(0.1); timeout = timeout + 0.1
+	local limb, t0 = nil, tick()
+	while tick() - t0 < 5 do
+		limb = Character:FindFirstChild(hatlimb) or Character:FindFirstChild("Right Arm")
+		if limb then break end
+		task.wait(0.1)
 	end
-	pcall(function()
-		local acc
-		for _, v in ipairs(Character:GetChildren()) do
-			if v:IsA("Accessory") or v:IsA("Hat") then acc = v; break end
-		end
-		if not acc then return end
-		local handle = acc:FindFirstChild("Handle")
-		if not handle then return end
-		for _, v in ipairs(handle:GetChildren()) do
-			if v:IsA("Weld") or v:IsA("Motor6D") or v:IsA("WeldConstraint") then v:Destroy() end
-		end
-		local grip = IT("Part")
-		grip.Name = "AccessoryGrip"; grip.Size = VT(0.2,0.2,0.2)
-		grip.Transparency = 1; grip.CanCollide = false; grip.Anchored = false
-		grip.Parent = Character
-		local gw = IT("Motor6D")
-		gw.Name = "GripWeld"; gw.Part0 = Character:FindFirstChild(hatlimb) or RightArm; gw.Part1 = grip
-		gw.C0 = hatcf; gw.Parent = grip
-		local ap = IT("AlignPosition")
-		ap.Attachment0 = IT("Attachment", handle)
-		ap.Attachment1 = IT("Attachment", grip)
-		ap.RigidityEnabled = false; ap.Responsiveness = 200; ap.MaxForce = 100000
-		ap.Parent = handle
-		local ao = IT("AlignOrientation")
-		ao.Attachment0 = ap.Attachment0; ao.Attachment1 = ap.Attachment1
-		ao.MaxTorque = 100000; ao.Responsiveness = 200; ao.Parent = handle
-	end)
+	if limb then
+		pcall(function()
+			local acc = resolveAcc(Character, hatid, hatname)
+			if not acc then warn("[blade] accessory not found: "..tostring(hatid).." / "..tostring(hatname)); return end
+			local handle = acc:FindFirstChild("Handle")
+			if not handle then return end
+			for _, v in ipairs(handle:GetChildren()) do
+				if v:IsA("Weld") or v:IsA("Motor6D") or v:IsA("WeldConstraint") then v:Destroy() end
+			end
+			local grip = IT("Part")
+			grip.Name = "AccessoryGrip"; grip.Size = VT(0.2,0.2,0.2)
+			grip.Transparency = 1; grip.CanCollide = false; grip.Anchored = false
+			grip.Parent = Character
+			local gw = IT("Motor6D")
+			gw.Name = "GripWeld"; gw.Part0 = BLADE; gw.Part1 = grip
+			gw.C0 = hatcf; gw.Parent = grip
+			local ap = IT("AlignPosition")
+			ap.Attachment0 = IT("Attachment", handle)
+			ap.Attachment1 = IT("Attachment", grip)
+			ap.RigidityEnabled = false; ap.Responsiveness = 200; ap.MaxForce = 100000
+			ap.Parent = handle
+			local ao = IT("AlignOrientation")
+			ao.Attachment0 = ap.Attachment0; ao.Attachment1 = ap.Attachment1
+			ao.MaxTorque = 100000; ao.Responsiveness = 200; ao.Parent = handle
+		end)
+	end
 end
 
 local EYE = IT("Part")
@@ -397,7 +431,7 @@ BMUSIC:Play()
 local A = IT("Attachment", Torso)
 
 coroutine.resume(coroutine.create(function()
-	while task.wait(1) do
+	while task.wait(1) and ALIVE do
 		if FADERS and EYE and EYE.Parent then
 			coroutine.resume(coroutine.create(function()
 				local RING = CreatePart(Effects, "Granite", 0, 1, "Maroon", "MagicRing", VT(0.1,0.1,0.1), true)
@@ -407,11 +441,12 @@ coroutine.resume(coroutine.create(function()
 				local decal = IT("Decal", RING); decal.Face = "Top"
 				decal.Texture = "rbxassetid://1208118228"
 				for i = 1, 35 do
+					if not ALIVE then break end
 					Swait()
 					M.Scale = M.Scale + VT(1,0,1)*1.2
 					decal.Transparency = i/35
 				end
-				RING:Destroy()
+				if RING then RING:Destroy() end
 			end))
 		end
 	end
@@ -987,11 +1022,13 @@ local function unanchor()
 	RootPart.Anchored = (UNANCHOR ~= true)
 end
 
-Mouse.Button1Down:Connect(function()
+track(Mouse.Button1Down:Connect(function()
+	if not ALIVE then return end
 	if ATTACK == false then Melee() end
-end)
+end))
 
-UIS.InputBegan:Connect(function(input, gp)
+track(UIS.InputBegan:Connect(function(input, gp)
+	if not ALIVE then return end
 	if gp then return end
 	if ATTACK then return end
 	if input.KeyCode == Enum.KeyCode.Z then AbyssalShriek()
@@ -1000,13 +1037,15 @@ UIS.InputBegan:Connect(function(input, gp)
 	elseif input.KeyCode == Enum.KeyCode.V then BlackBlast()
 	elseif input.KeyCode == Enum.KeyCode.Q then NightmareFall()
 	end
-end)
+end))
 
-Humanoid.Changed:Connect(function(prop)
+track(Humanoid.Changed:Connect(function(prop)
+	if not ALIVE then return end
 	if prop == "Jump" and Disable_Jump then Humanoid.Jump = false end
-end)
+end))
 
-RunService.RenderStepped:Connect(function()
+track(RunService.RenderStepped:Connect(function()
+	if not ALIVE then return end
 	SINE = SINE + CHANGE
 	if not RootPart or not RootPart.Parent then return end
 	local TORSOVELOCITY = (RootPart.Velocity * VT(1,0,1)).Magnitude
@@ -1083,9 +1122,12 @@ RunService.RenderStepped:Connect(function()
 		BMUSIC.Pitch = 1
 		BMUSIC:Play()
 	end
-end)
+end))
 
 local function shutdown()
+	ALIVE = false
+	for _, c in ipairs(CONNS) do pcall(function() c:Disconnect() end) end
+	CONNS = {}
 	if Humanoid then pcall(function() Humanoid.WalkSpeed = 16; Humanoid.HipHeight = 0 end) end
 	if Effects and Effects.Parent then Effects:Destroy() end
 	if WEAPONGUI and WEAPONGUI.Parent then WEAPONGUI:Destroy() end

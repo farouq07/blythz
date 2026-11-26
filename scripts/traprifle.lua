@@ -431,14 +431,8 @@ local function bindCharacter(c)
 	musicSound:Play()
 end
 
-bindCharacter(Player.Character or Player.CharacterAdded:Wait())
-Player.CharacterAdded:Connect(function(c)
-	task.wait(0.2)
-	bindCharacter(c)
-end)
-
 local function getShotPt()
-	local gun = chara:FindFirstChild("LuvGun")
+	local gun = chara and chara:FindFirstChild("LuvGun")
 	if not gun then return nil end
 	return gun:FindFirstChild("ShotPt")
 end
@@ -627,44 +621,90 @@ local function badoge()
 	attack = false
 end
 
-Mouse.Button1Down:Connect(function()
+local function safeShoot()
+	if not chara or not chara.Parent then return end
+	if not getShotPt() then return end
 	if attack == false then
 		zhold = true
-		shoot()
+		local ok, err = pcall(shoot)
+		if not ok then
+			warn("[shoot] "..tostring(err))
+			attack = false
+			zhold = false
+		end
 	end
-end)
+end
 
-Mouse.Button1Up:Connect(function()
-	zhold = false
-end)
+local function safeDoge(fn)
+	if not chara or not chara.Parent or not Humanoid then return end
+	local ok, err = pcall(fn)
+	if not ok then
+		warn("[doge] "..tostring(err))
+		attack = false
+	end
+end
 
-UIS.InputBegan:Connect(function(input, gp)
-	if gp then return end
-	local k = input.KeyCode.Name:lower()
-	if k == "m" then
-		if musicSound then
+local function hookInputs()
+	Mouse = Player:GetMouse()
+	Mouse.Button1Down:Connect(function()
+		safeShoot()
+	end)
+	Mouse.Button1Up:Connect(function()
+		zhold = false
+	end)
+	UIS.InputBegan:Connect(function(input, gp)
+		if gp then return end
+		if not chara or not chara.Parent or not Humanoid then return end
+		local k = input.KeyCode.Name:lower()
+		if k == "m" and musicSound and musicSound.Parent then
 			if musicSound.IsPlaying then musicSound:Stop()
 			elseif musicSound.IsPaused then musicSound:Resume()
 			else musicSound:Play() end
 		end
-	end
-	if attack == false then
-		if k == "q" then
-			if Anim == "Fall" or Anim == "Jump" then badoge() else bdoge() end
-		elseif k == "e" then
-			if Anim == "Fall" or Anim == "Jump" then adoge() else doge() end
+		if attack == false then
+			if k == "q" then
+				if Anim == "Fall" or Anim == "Jump" then safeDoge(badoge) else safeDoge(bdoge) end
+			elseif k == "e" then
+				if Anim == "Fall" or Anim == "Jump" then safeDoge(adoge) else safeDoge(doge) end
+			end
 		end
+	end)
+	UIS.InputEnded:Connect(function(input, gp)
+		if gp then return end
+		if input.KeyCode == Enum.KeyCode.Z then zhold = false end
+	end)
+end
+
+local function waitForChar()
+	local c = Player.Character
+	if not c or not c.Parent or not c:FindFirstChild("Humanoid") then
+		c = Player.CharacterAdded:Wait()
 	end
+	c:WaitForChild("Humanoid")
+	c:WaitForChild("HumanoidRootPart")
+	return c
+end
+
+local function safeBind(c)
+	local ok, err = pcall(bindCharacter, c)
+	if not ok then warn("[bind] "..tostring(err)) end
+end
+
+safeBind(waitForChar())
+
+Player.CharacterAdded:Connect(function(c)
+	attack = false
+	zhold = false
+	task.wait(0.25)
+	safeBind(c)
 end)
 
-UIS.InputEnded:Connect(function(input, gp)
-	if gp then return end
-	if input.KeyCode == Enum.KeyCode.Z then zhold = false end
-end)
+hookInputs()
 
 RunService.RenderStepped:Connect(function()
 	if not chara or not chara.Parent then return end
 	if not RootPart or not RootPart.Parent then return end
+	if not Humanoid or Humanoid.Health <= 0 then return end
 	local Torsovelocity = (RootPart.Velocity * Vector3.new(1,0,1)).Magnitude
 	local hit = rayCast(RootPart.Position, (CFrame.new(RootPart.Position, RootPart.Position - Vector3.new(0,1,0))).LookVector, 4, chara)
 	sine = sine + change
